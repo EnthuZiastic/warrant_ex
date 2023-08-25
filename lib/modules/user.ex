@@ -1,9 +1,10 @@
 defmodule WarrantEx.User do
   @moduledoc false
   alias __MODULE__
-  alias WarrantEx.Request
+  alias WarrantEx.API
   alias WarrantEx.TypeUtils
 
+  @enforce_keys [:user_id]
   defstruct [:user_id, :email, :created_at]
 
   @type t() :: %User{
@@ -12,12 +13,14 @@ defmodule WarrantEx.User do
           created_at: DateTime.t()
         }
 
+  @namespace "/v1/users"
+
   @doc """
   Create a new user struct
   Expects a unique user_id, and email and created_at
   """
 
-  @spec new(String.t(), String.t(), String.t()) :: WarrantEx.User.t()
+  @spec new(String.t(), String.t(), String.t()) :: t()
   def new(user_id, email, created_at) do
     {:ok, dt, _} = DateTime.from_iso8601(created_at)
 
@@ -28,39 +31,14 @@ defmodule WarrantEx.User do
     }
   end
 
-  @spec get(String.t()) :: User.t()
+  @spec get(String.t()) :: {:ok, t()} | {:error, any()}
   def get(user_id) do
-    response =
-      Request.new()
-      |> Request.with_method(:get)
-      |> Request.with_path("/v1/users/#{user_id}")
-      |> Request.send()
-
-    case response do
-      {:ok, result} ->
-        {:ok, new(result["userId"], result["email"], result["createdAt"])}
-
-      _ ->
-        response
-    end
+    @namespace |> API.get(user_id) |> handle_response()
   end
 
-  @spec list(TypeUtils.list_filter()) :: [User.t()]
+  @spec list(TypeUtils.list_filter()) :: {:ok, [t()]} | {:error, any()}
   def list(filter) do
-    response =
-      Request.new()
-      |> Request.with_method(:get)
-      |> Request.with_path("/v1/users")
-      |> Request.with_params(filter)
-      |> Request.send()
-
-    case response do
-      {:ok, result} ->
-        {:ok, Enum.map(result, &new(&1["userId"], &1["email"], &1["createdAt"]))}
-
-      _ ->
-        response
-    end
+    @namespace |> API.list(filter) |> handle_response()
   end
 
   @doc """
@@ -69,25 +47,9 @@ defmodule WarrantEx.User do
       - userId
       - email
   """
-  @spec create(map() | [map()]) :: {:error, any} | {:ok, User.t() | [User.t()]}
+  @spec create(map() | [map()]) :: {:error, any} | {:ok, t() | [t()]}
   def create(params) do
-    response =
-      Request.new()
-      |> Request.with_method(:post)
-      |> Request.with_path("/v1/users")
-      |> Request.with_body(params)
-      |> Request.send()
-
-    case response do
-      {:ok, result} when is_list(result) ->
-        {:ok, Enum.map(result, &new(&1["userId"], &1["email"], &1["createdAt"]))}
-
-      {:ok, result} ->
-        {:ok, new(result["userId"], result["email"], result["createdAt"])}
-
-      _ ->
-        response
-    end
+    @namespace |> API.create(params) |> handle_response()
   end
 
   @doc """
@@ -97,22 +59,9 @@ defmodule WarrantEx.User do
   Example:
     WarrantEx.User.update("user_1", %{email: "new_email"})
   """
-  @spec update(String.t(), map) :: {:error, any} | {:ok, User.t()}
+  @spec update(String.t(), map) :: {:error, any} | {:ok, t()}
   def update(user_id, params) do
-    response =
-      Request.new()
-      |> Request.with_method(:put)
-      |> Request.with_path("/v1/users/#{user_id}")
-      |> Request.with_body(params)
-      |> Request.send()
-
-    case response do
-      {:ok, result} ->
-        {:ok, new(result["userId"], result["email"], result["createdAt"])}
-
-      _ ->
-        response
-    end
+    @namespace |> API.update(user_id, params) |> handle_response()
   end
 
   @doc """
@@ -126,33 +75,15 @@ defmodule WarrantEx.User do
   """
 
   @spec delete([map()] | String.t()) :: :ok
-  def delete(params) when is_list(params) do
-    response =
-      Request.new()
-      |> Request.with_method(:delete)
-      |> Request.with_path("/v1/users")
-      |> Request.with_body(params)
-      |> Request.send()
+  def delete(params) when is_list(params), do: API.delete(@namespace, params)
 
+  defp handle_response(response) do
     case response do
-      {:ok, _} ->
-        :ok
+      {:ok, result} when is_list(result) ->
+        {:ok, Enum.map(result, &new(&1["userId"], &1["email"], &1["createdAt"]))}
 
-      _ ->
-        response
-    end
-  end
-
-  def delete(user_id) do
-    response =
-      Request.new()
-      |> Request.with_method(:delete)
-      |> Request.with_path("/v1/users/#{user_id}")
-      |> Request.send()
-
-    case response do
-      {:ok, _} ->
-        :ok
+      {:ok, result} ->
+        {:ok, new(result["userId"], result["email"], result["createdAt"])}
 
       _ ->
         response
