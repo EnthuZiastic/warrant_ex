@@ -8,7 +8,8 @@ defmodule WarrantEx.Config do
 
   @enforce_keys [:base_url, :api_key]
   defstruct base_url: @default_base_url,
-            api_key: @type(t() :: %Config{base_url: String.t(), api_key: String.t()})
+            api_key: @type(t() :: %Config{base_url: String.t(), api_key: String.t()}),
+            authorize_endpoint: nil
 
   @spec get_config :: Config.t()
   def get_config do
@@ -21,7 +22,7 @@ defmodule WarrantEx.Config do
     end
   end
 
-  @spec get_config(atom()) :: String.t()
+  @spec get_config(atom()) :: String.t() | nil
   def get_config(key) when is_atom(key) do
     get_config() |> Map.get(key) |> get_value()
   end

@@ -2,7 +2,9 @@ defmodule WarrantEx.Tenant do
   @moduledoc false
   alias __MODULE__
   alias WarrantEx.API
+  alias WarrantEx.PricingTier
   alias WarrantEx.TypeUtils
+  alias WarrantEx.User
   alias WarrantEx.Warrant
 
   @enforce_keys [:tenant_id]
@@ -36,6 +38,25 @@ defmodule WarrantEx.Tenant do
   @spec list(TypeUtils.list_filter()) :: {:ok, [Tenant.t()]} | {:error, any()}
   def list(filter) do
     @namespace |> API.list(filter) |> handle_response()
+  end
+
+  def list_users(tenant_id, filter) do
+    namespace = "#{@namespace}/#{tenant_id}/users"
+    namespace |> API.list(filter) |> User.handle_response()
+  end
+
+  @spec list_pricing_tiers(String.t(), TypeUtils.list_filter()) ::
+          {:ok, [PricingTier.t()]} | {:error, any()}
+  def list_pricing_tiers(tenant_id, filter) do
+    namespace = "#{@namespace}/#{tenant_id}/pricing-tiers"
+    namespace |> API.list(filter) |> PricingTier.handle_response()
+  end
+
+  @spec list_features(String.t(), TypeUtils.list_filter()) ::
+          {:ok, [Feature.t()]} | {:error, any()}
+  def list_features(tenant_id, filter) do
+    namespace = "#{@namespace}/#{tenant_id}/features"
+    namespace |> API.list(filter) |> WarrantEx.Feature.handle_response()
   end
 
   @doc """
@@ -73,15 +94,47 @@ defmodule WarrantEx.Tenant do
   """
 
   @spec delete([map()] | String.t()) :: :ok
-  def delete(params) when is_list(params), do: API.delete(@namespace, params)
+  def delete(params), do: API.delete(@namespace, params)
 
   @spec assign_user(String.t(), String.t()) :: {:ok, map()} | {:error, any()}
   def assign_user(tenant_id, user_id) do
-    path = "#{@namespace}/#{tenant_id}/users/#{user_id}"
-    path |> API.create() |> Warrant.handle_response()
+    namespace = "#{@namespace}/#{tenant_id}/users/#{user_id}"
+    namespace |> API.create() |> Warrant.handle_response()
   end
 
-  defp handle_response(response) do
+  @spec assign_pricing_tier(String.t(), String.t()) :: {:ok, map()} | {:error, any()}
+  def assign_pricing_tier(tenant_id, pricing_tier_id) do
+    namespace = "#{@namespace}/#{tenant_id}/pricing-tiers/#{pricing_tier_id}"
+    namespace |> API.create() |> Warrant.handle_response()
+  end
+
+  @spec assing_feature(String.t(), String.t()) :: {:ok, map()} | {:error, any()}
+  def assing_feature(tenant_id, feature_id) do
+    namespace = "#{@namespace}/#{tenant_id}/features/#{feature_id}"
+    namespace |> API.create() |> Warrant.handle_response()
+  end
+
+  @spec remove_user(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_user(tenant_id, user_id) do
+    namespace = "#{@namespace}/#{tenant_id}/users"
+    API.delete(namespace, user_id)
+  end
+
+  @spec remove_pricing_tier(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_pricing_tier(tenant_id, pricing_tier_id) do
+    namespace = "#{@namespace}/#{tenant_id}/pricing-tiers"
+    API.delete(namespace, pricing_tier_id)
+  end
+
+  @spec remove_feature(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_feature(tenant_id, feature_id) do
+    namespace = "#{@namespace}/#{tenant_id}/features"
+    API.delete(namespace, feature_id)
+  end
+
+  @spec handle_response({:ok, map() | [map()]} | {:error, any()}) ::
+          {:ok, t() | [t()]} | {:error, any()}
+  def handle_response(response) do
     case response do
       {:ok, result} when is_list(result) ->
         {:ok, Enum.map(result, &new(&1["tenantId"], &1["name"]))}

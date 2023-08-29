@@ -3,29 +3,59 @@ defmodule WarrantEx.Warrant do
   Warrant is a library for interacting with the Warrant API.
   """
   alias __MODULE__
-  alias __MODULE__.Subject
+  alias WarrantEx.API
+  alias WarrantEx.Warrant.Object
 
-  @enforce_keys [:object_type, :object_id, :relation, :subject]
-  defstruct [:object_type, :object_id, :relation, :subject, :policy]
+  @enforce_keys [:object, :subject, :relation]
+  defstruct [:object, :subject, :relation, options: []]
 
-  @type object_type() :: :tenant | :user
   @type t() :: %Warrant{
-          object_type: object_type(),
-          object_id: String.t(),
+          object: Object.t(),
+          subject: Object.t(),
           relation: String.t(),
-          subject: Subject.t(),
-          policy: String.t() | nil
+          options: keyword()
         }
 
-  @spec new(object_type(), String.t(), String.t(), map(), String.t() | nil) :: t()
-  def new(object_type, object_id, relation, subject, policy \\ nil) do
+  @type filter() :: %{
+          object: Object.t(),
+          subject: Object.t(),
+          relation: String.t(),
+          subjectRelation: String.t()
+        }
+
+  @namespace "/v1/warrants"
+
+  @spec new(Object.object_type() | String.t(), String.t(), String.t(), map(), String.t() | nil) ::
+          t()
+  def new(object_type, object_id, relation, subject, policy \\ nil)
+
+  def new(object_type, object_id, relation, subject, policy) when is_atom(object_type) do
     %Warrant{
-      object_type: object_type,
-      object_id: object_id,
+      object: Object.new(object_type, object_id),
+      subject: Object.new(subject["objectType"], subject["objectId"]),
       relation: relation,
-      subject: Subject.new(subject["objectType"], subject["objectId"]),
-      policy: policy
+      options: [policy: policy]
     }
+  end
+
+  def new(object_type, object_id, relation, subject, policy) when is_binary(object_type) do
+    object_type |> String.to_existing_atom() |> new(object_id, relation, subject, policy)
+  end
+
+  @spec list(filter()) :: {:ok, [t()]} | {:error, any()}
+  def list(params) when is_map(params) do
+    params = Enum.reduce(params, params, &from_object/2)
+    @namespace |> API.list(params) |> handle_response()
+  end
+
+  @spec create(map()) :: {:ok, t()} | {:error, any()}
+  def create(params) do
+    @namespace |> API.create(params) |> handle_response()
+  end
+
+  @spec delete(map()) :: :ok | {:error, any()}
+  def delete(params) when is_map(params) do
+    API.delete(@namespace, params)
   end
 
   @spec handle_response(any) :: {:ok, t()} | {:error, any()}
@@ -52,25 +82,20 @@ defmodule WarrantEx.Warrant do
         response
     end
   end
-end
 
-defmodule WarrantEx.Warrant.Subject do
-  @moduledoc false
-  alias __MODULE__
-
-  @enforce_keys [:object_type, :object_id]
-  defstruct [:object_type, :object_id]
-
-  @type t() :: %Subject{
-          object_type: WarrantEx.Warrant.object_type(),
-          object_id: String.t()
-        }
-
-  @spec new(WarrantEx.Warrant.object_type(), String.t()) :: t()
-  def new(object_type, object_id) do
-    %Subject{
-      object_type: object_type,
-      object_id: object_id
-    }
+  defp from_object({:object, %Object{object_type: object_type, object_id: object_id}}, params) do
+    params
+    |> Map.put(:objectType, object_type)
+    |> Map.put(:objectId, object_id)
+    |> Map.delete(:object)
   end
+
+  defp from_object({:subject, %Object{object_type: object_type, object_id: object_id}}, params) do
+    params
+    |> Map.put(:subjectType, object_type)
+    |> Map.put(:subjectId, object_id)
+    |> Map.delete(:subject)
+  end
+
+  defp from_object(_, params), do: params
 end

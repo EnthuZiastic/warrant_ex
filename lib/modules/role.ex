@@ -2,7 +2,9 @@ defmodule WarrantEx.Role do
   @moduledoc false
   alias __MODULE__
   alias WarrantEx.API
+  alias WarrantEx.Permission
   alias WarrantEx.TypeUtils
+  alias WarrantEx.Warrant
 
   @enforce_keys [:role_id, :name]
   defstruct [:role_id, :name, :description]
@@ -75,9 +77,48 @@ defmodule WarrantEx.Role do
   """
 
   @spec delete([map()] | String.t()) :: :ok
-  def delete(params) when is_list(params), do: API.delete(@namespace, params)
+  def delete(params), do: API.delete(@namespace, params)
 
-  defp handle_response(response) do
+  @spec assign_permission(String.t(), String.t()) :: {:ok, Warrant.t()} | {:error, any()}
+  def assign_permission(role_id, permission_id) do
+    namespace = "#{@namespace}/#{role_id}/permissions/#{permission_id}"
+    namespace |> API.create() |> Warrant.handle_response()
+  end
+
+  @spec remove_permission(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_permission(role_id, permission_id) do
+    namespace = "#{@namespace}/#{role_id}/permissions"
+    API.delete(namespace, permission_id)
+  end
+
+  @spec list_permissions(String.t(), TypeUtils.list_filter() | map()) ::
+          {:ok, [Permission.t()]} | {:error, any()}
+  def list_permissions(role_id, filter) do
+    namespace = "#{@namespace}/#{role_id}/permissions"
+    namespace |> API.list(filter) |> Permission.handle_response()
+  end
+
+  @spec list_implied_roles(String.t()) :: {:ok, [t()]} | {:error, any()}
+  def list_implied_roles(role_id) do
+    namespace = "#{@namespace}/#{role_id}/roles"
+    namespace |> API.list(%{}) |> handle_response()
+  end
+
+  @spec add_implied_role(String.t(), String.t()) :: {:ok, Warrant.t()} | {:error, any()}
+  def add_implied_role(role_id, implied_role_id) do
+    namespace = "#{@namespace}/#{role_id}/roles/#{implied_role_id}"
+    namespace |> API.create() |> handle_response()
+  end
+
+  @spec remove_implied_role(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_implied_role(role_id, implied_role_id) do
+    namespace = "#{@namespace}/#{role_id}/roles"
+    API.delete(namespace, implied_role_id)
+  end
+
+  @spec handle_response({:ok, map() | [map()]} | {:error, any()}) ::
+          {:ok, t() | [t()]} | {:error, any()}
+  def handle_response(response) do
     case response do
       {:ok, result} when is_list(result) ->
         {:ok, Enum.map(result, &new(&1["roleId"], &1["name"], &1["description"]))}

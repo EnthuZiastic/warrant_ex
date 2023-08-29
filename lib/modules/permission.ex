@@ -34,8 +34,8 @@ defmodule WarrantEx.Permission do
     @namespace |> API.get(permission_id) |> handle_response()
   end
 
-  @spec list(TypeUtils.list_filter()) :: {:ok, [t()]} | {:error, any()}
-  def list(filter) do
+  @spec list(TypeUtils.list_filter() | map()) :: {:ok, [t()]} | {:error, any()}
+  def list(filter \\ %{}) do
     @namespace |> API.list(filter) |> handle_response()
   end
 
@@ -75,9 +75,29 @@ defmodule WarrantEx.Permission do
   """
 
   @spec delete([map()] | String.t()) :: :ok
-  def delete(params) when is_list(params), do: API.delete(@namespace, params)
+  def delete(params), do: API.delete(@namespace, params)
 
-  defp handle_response(response) do
+  @spec list_implied_permissions(String.t()) :: {:ok, [t()]} | {:error, any()}
+  def list_implied_permissions(permission_id) do
+    namespace = "#{@namespace}/#{permission_id}/permissions"
+    namespace |> API.list(%{}) |> handle_response()
+  end
+
+  @spec add_implied_permission(String.t(), String.t()) :: {:ok, t()} | {:error, any()}
+  def add_implied_permission(permission_id, implied_permission_id) do
+    namespace = "#{@namespace}/#{permission_id}/permissions/#{implied_permission_id}"
+    namespace |> API.create() |> handle_response()
+  end
+
+  @spec remove_implied_permission(String.t(), String.t()) :: :ok | {:error, any()}
+  def remove_implied_permission(permission_id, implied_permission_id) do
+    namespace = "#{@namespace}/#{permission_id}/permissions"
+    API.delete(namespace, implied_permission_id)
+  end
+
+  @spec handle_response({:ok, map() | [map()]} | {:error, any()}) ::
+          {:ok, t() | [t()]} | {:error, any()}
+  def handle_response(response) do
     case response do
       {:ok, result} when is_list(result) ->
         {:ok, Enum.map(result, &new(&1["permissionId"], &1["name"], &1["description"]))}

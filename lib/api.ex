@@ -15,7 +15,7 @@ defmodule WarrantEx.API do
     |> Request.send()
   end
 
-  @spec list(namespace(), TypeUtils.list_filter()) :: {:ok, list()} | {:error, any()}
+  @spec list(namespace(), TypeUtils.list_filter() | map()) :: {:ok, list()} | {:error, any()}
   def list(namespace, filter) do
     Request.new()
     |> Request.with_method(:get)
@@ -52,8 +52,8 @@ defmodule WarrantEx.API do
     |> Request.send()
   end
 
-  @spec delete(namespace(), [map()] | String.t()) :: :ok | {:error, any()}
-  def delete(namespace, params) when is_list(params) do
+  @spec delete(namespace(), [map()] | map() | String.t()) :: :ok | {:error, any()}
+  def delete(namespace, params) when is_list(params) or is_map(params) do
     Request.new()
     |> Request.with_method(:delete)
     |> Request.with_path(namespace)

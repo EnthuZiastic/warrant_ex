@@ -5,53 +5,60 @@ defmodule WarrantEx.Request do
   alias __MODULE__
   alias WarrantEx.Config
 
-  defstruct [:base_url, :path, :method, :params, :body, :options]
+  defstruct base_url: nil, method: :get, path: nil, params: %{}, body: ""
 
   @type t() :: %Request{
-          base_url: String.t(),
-          path: String.t(),
+          base_url: String.t() | nil,
+          path: String.t() | nil,
           method: HTTPoison.method(),
-          params: map(),
-          body: map(),
-          options: list()
+          params: HTTPoison.params(),
+          body: HTTPoison.body()
         }
 
+  @spec new :: t()
   def new, do: %Request{}
 
+  @spec with_base_url(t(), String.t()) :: t()
+  def with_base_url(%Request{} = r, base_url) when is_binary(base_url) do
+    %{r | base_url: base_url}
+  end
+
+  @spec with_method(t(), HTTPoison.method()) :: t()
   def with_method(%Request{} = r, method) do
     %{r | method: method}
   end
 
+  @spec with_path(t(), String.t()) :: t()
   def with_path(%Request{} = r, path) do
     %{r | path: path}
   end
 
+  @spec with_body(t(), Enum.t() | String.t()) :: t()
   def with_body(%Request{} = r, body) do
+    body =
+      case body do
+        body when is_map(body) or is_list(body) -> Jason.encode!(body)
+        body when is_binary(body) -> body
+      end
+
     %{r | body: body}
   end
 
+  @spec with_params(t(), map()) :: t()
   def with_params(%Request{} = r, params) do
     %{r | params: params}
   end
 
+  @spec send(t()) :: {:ok, map() | String.t()} | {:error, any()}
   def send(%Request{} = r) do
     config = Config.get_config()
 
     headers = build_header(config)
     url = construct_url(r, config)
 
-    body =
-      case r.body do
-        body when is_map(body) or is_list(body) -> Jason.encode!(body)
-        body when is_binary(body) -> body
-        nil -> ""
-      end
-
     r.method
-    |> HTTPoison.request(url, body, headers)
-    |> IO.inspect()
+    |> HTTPoison.request(url, r.body, headers, params: r.params)
     |> handle_response()
-    |> IO.inspect()
   end
 
   defp build_header(config) do
