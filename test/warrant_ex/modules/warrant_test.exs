@@ -16,10 +16,11 @@ defmodule WarrantEx.WarrantTest do
       assert warrant.object.object_type == :tenant
       assert warrant.object.object_id == "tenant_1"
       assert warrant.relation == "owns"
+      assert warrant.options == [policy: nil]
       assert %Object{} = warrant.subject
       assert warrant.subject.object_type == :user
       assert warrant.subject.object_id == "user_1"
-      assert warrant.policy == nil
+      assert warrant.options == [policy: nil]
     end
   end
 end
